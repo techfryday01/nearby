@@ -13,9 +13,11 @@ import {
   loadMatches as readMatches,
   storeConversation,
   storeMatches,
+  clearMatchesAndConversations,
   type ChatMessage,
   type MatchProfile,
 } from './matchStorage';
+import { supabase } from '../lib/supabase';
 
 export type { ChatMessage, MatchProfile } from './matchStorage';
 
@@ -23,6 +25,7 @@ type MatchContextValue = {
   matches: MatchProfile[];
   isMatchesLoaded: boolean;
   addMatch: (profile: MatchProfile) => Promise<void>;
+  clearMatches: () => Promise<void>;
   loadConversation: (matchId: string) => Promise<ChatMessage[] | null>;
   saveConversation: (matchId: string, messages: ChatMessage[]) => Promise<void>;
 };
@@ -77,6 +80,24 @@ export function MatchProvider({ children }: { children: ReactNode }) {
     setMatches(nextMatches);
   }, []);
 
+  const clearMatches = useCallback(async () => {
+    await clearMatchesAndConversations();
+    matchesRef.current = [];
+    setMatches([]);
+    matchesLoadedRef.current = true;
+    setIsMatchesLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        void clearMatches().catch(() => undefined);
+      }
+    });
+
+    return () => authListener.subscription.unsubscribe();
+  }, [clearMatches]);
+
   const loadConversation = useCallback((matchId: string) => readConversation(matchId), []);
 
   const saveConversation = useCallback((matchId: string, messages: ChatMessage[]) => {
@@ -89,8 +110,8 @@ export function MatchProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ matches, isMatchesLoaded, addMatch, loadConversation, saveConversation }),
-    [matches, isMatchesLoaded, addMatch, loadConversation, saveConversation],
+    () => ({ matches, isMatchesLoaded, addMatch, clearMatches, loadConversation, saveConversation }),
+    [matches, isMatchesLoaded, addMatch, clearMatches, loadConversation, saveConversation],
   );
 
   return <MatchContext.Provider value={value}>{children}</MatchContext.Provider>;

@@ -1,172 +1,39 @@
-﻿import React from 'react';
-import {
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
+import { DEVELOPMENT_AUTH_BYPASS } from '../lib/authConfig';
+import { useProfile } from '../state/ProfileContext';
+import { useTheme } from '../theme/ThemeContext';
+import { SecondMeetMark } from '../components/SecondMeetBrand';
+import { GlassBackground, GradientButton } from '../components/Glass';
 
 export default function WelcomeScreen() {
   const router = useRouter();
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="#09090D"
-      />
-
-      <View style={styles.content}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoSymbol}>N</Text>
-        </View>
-
-        <Text style={styles.logo}>Nearby</Text>
-
-        <Text style={styles.headline}>
-          Real People.{'\n'}
-          <Text style={styles.accent}>
-            Real Connections.
-          </Text>
-        </Text>
-
-        <Text style={styles.subtitle}>
-          Discover people around you and start a genuine
-          conversation.
-        </Text>
-
-        <View style={styles.spacer} />
-
-        <TouchableOpacity
-          style={styles.primaryButton}
-          activeOpacity={0.85}
-          onPress={() => router.push('/age-verification')}
-        >
-          <Text style={styles.primaryButtonText}>
-            Get Started
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.secondaryButtonText}>
-            I already have an account
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.ageNotice}>
-          18+ • Dating & social connections
-        </Text>
+  const { mode, colors } = useTheme();
+  const s = styles(colors);
+  const { isProfileLoaded, isAuthenticated, hasSupabaseProfile, profileLoadError } = useProfile();
+  useEffect(() => {
+    if (DEVELOPMENT_AUTH_BYPASS || !isProfileLoaded || !isAuthenticated || profileLoadError) return;
+    router.replace(hasSupabaseProfile ? '/discovery' : '/create-profile');
+  }, [hasSupabaseProfile, isAuthenticated, isProfileLoaded, profileLoadError, router]);
+  return <GlassBackground>
+    <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} />
+    <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}>
+      <View style={s.hero}>
+        <View style={s.halo}><SecondMeetMark size={190} /></View>
+        <Text style={s.brand}>SECOND<Text style={s.accent}>MEET</Text></Text>
+        <Text style={s.tagline}>Real People. Real Connections.</Text>
       </View>
-    </SafeAreaView>
-  );
+      <View style={s.panel}>
+        <Text style={s.headline}>A second chance at{ '\n' }something wonderful.</Text>
+        <Text style={s.copy}>Meet genuine people and build meaningful connections.</Text>
+        <GradientButton onPress={() => router.push('/age-verification')} style={s.primary}><Text style={s.buttonText}>Get Started</Text><Text style={s.arrow}>→</Text></GradientButton>
+        <Pressable accessibilityRole="button" onPress={() => router.push(DEVELOPMENT_AUTH_BYPASS ? '/create-profile' : ('/login' as Href))} style={s.secondary}><Text style={s.secondaryText}>I already have an account · Log In</Text></Pressable>
+      </View>
+      <Text style={s.footer}>18+ · Connect with intention</Text>
+    </ScrollView>
+  </GlassBackground>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#09090D',
-  },
-
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingTop: 50,
-    paddingBottom: 24,
-  },
-
-  logoCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#E83E8C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-
-  logoSymbol: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '800',
-  },
-
-  logo: {
-    color: '#FFFFFF',
-    fontSize: 30,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-
-  headline: {
-    width: '100%',
-    marginTop: 90,
-    color: '#FFFFFF',
-    fontSize: 42,
-    lineHeight: 48,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: -1,
-  },
-
-  accent: {
-    color: '#E83E8C',
-  },
-
-  subtitle: {
-    color: '#A9A9B2',
-    fontSize: 16,
-    lineHeight: 24,
-    textAlign: 'center',
-    marginTop: 22,
-    maxWidth: 330,
-  },
-
-  spacer: {
-    flex: 1,
-  },
-
-  primaryButton: {
-    width: '100%',
-    height: 58,
-    borderRadius: 18,
-    backgroundColor: '#E83E8C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-
-  secondaryButton: {
-    width: '100%',
-    height: 52,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#34343D',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  secondaryButtonText: {
-    color: '#E5E5EA',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
-  ageNotice: {
-    color: '#6F6F79',
-    fontSize: 12,
-    marginTop: 18,
-  },
-});
+function styles(c: ReturnType<typeof useTheme>['colors']) { return StyleSheet.create({
+ page:{flexGrow:1,paddingHorizontal:24,paddingTop:28,paddingBottom:24,justifyContent:'center',maxWidth:540,width:'100%',alignSelf:'center'},hero:{alignItems:'center',paddingVertical:28},halo:{borderRadius:110,overflow:'hidden',borderWidth:1,borderColor:'#E97AB044',shadowColor:c.accent,shadowOpacity:0.4,shadowRadius:28},brand:{fontSize:28,fontWeight:'800',letterSpacing:3,color:c.text,marginTop:22},accent:{color:c.accent},tagline:{fontSize:14,color:c.text,marginTop:10,fontWeight:'500'},panel:{paddingVertical:22,marginTop:22},headline:{color:c.text,fontSize:23,lineHeight:30,fontWeight:'700',textAlign:'center'},copy:{color:c.muted,fontSize:14,lineHeight:22,textAlign:'center',marginTop:12,marginBottom:26},primary:{flexDirection:'row',gap:22},buttonText:{color:'#FFFFFF',fontWeight:'800',fontSize:16},arrow:{color:'#FFFFFF',fontSize:23},secondary:{minHeight:52,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:c.border,borderRadius:26,marginTop:12,paddingHorizontal:8,backgroundColor:c.surface},secondaryText:{color:c.text,fontSize:12,fontWeight:'600'},footer:{color:c.muted,fontSize:11,textAlign:'center',marginTop:22}
+}); }

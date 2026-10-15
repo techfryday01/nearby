@@ -9,12 +9,14 @@ export type MatchProfile = {
   age: number;
   initials: string;
   color: string;
+  photoUri?: string;
 };
 
 export type ChatMessage = {
   id: string;
   text: string;
   from: 'them' | 'me';
+  sentAt?: string;
 };
 
 function isMatchProfile(value: unknown): value is MatchProfile {
@@ -26,6 +28,7 @@ function isMatchProfile(value: unknown): value is MatchProfile {
     typeof match.age === 'number' &&
     typeof match.initials === 'string' &&
     typeof match.color === 'string'
+    && (match.photoUri === undefined || typeof match.photoUri === 'string')
   );
 }
 
@@ -36,6 +39,7 @@ function isChatMessage(value: unknown): value is ChatMessage {
     typeof message.id === 'string' &&
     typeof message.text === 'string' &&
     (message.from === 'them' || message.from === 'me')
+    && (message.sentAt === undefined || typeof message.sentAt === 'string')
   );
 }
 
@@ -80,4 +84,14 @@ export async function storeConversation(
   messages: ChatMessage[],
 ): Promise<void> {
   await AsyncStorage.setItem(conversationStorageKey(matchId), JSON.stringify(messages));
+}
+
+export async function clearMatchesAndConversations(): Promise<void> {
+  const keys = await AsyncStorage.getAllKeys();
+  const nearbyKeys = keys.filter(
+    (key) => key === MATCHES_STORAGE_KEY || key.startsWith('nearby.chat.'),
+  );
+  if (nearbyKeys.length > 0) {
+    await AsyncStorage.multiRemove(nearbyKeys);
+  }
 }

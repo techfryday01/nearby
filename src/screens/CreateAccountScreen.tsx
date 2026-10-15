@@ -1,20 +1,27 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { GlassBackground as SafeAreaView, GlassCard, GradientButton } from '../components/Glass';
+import { useRouter, type Href } from 'expo-router';
+import { DEVELOPMENT_AUTH_BYPASS } from '../lib/authConfig';
+import { getSafeAuthMessage } from '../lib/authErrors';
 import { supabase } from '../lib/supabase';
+import { SecondMeetMark } from '../components/SecondMeetBrand';
+import { useTheme } from '../theme/ThemeContext';
 
 export default function CreateAccountScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,6 +43,11 @@ export default function CreateAccountScreen() {
     setMessage('');
 
     try {
+      if (DEVELOPMENT_AUTH_BYPASS) {
+        router.push('/create-profile');
+        return;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: normalizedEmail,
         password,
@@ -45,7 +57,7 @@ export default function CreateAccountScreen() {
       });
 
       if (error) {
-        setMessage(error.message);
+        setMessage(getSafeAuthMessage(error));
         return;
       }
 
@@ -64,16 +76,13 @@ export default function CreateAccountScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="#09090D"
-      />
+      <StatusBar barStyle={colors.background === '#080B16' ? 'light-content' : 'dark-content'} />
 
       <KeyboardAvoidingView
         style={styles.keyboard}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
           {/* Header */}
           <View style={styles.topRow}>
@@ -93,16 +102,14 @@ export default function CreateAccountScreen() {
           {/* Main */}
           <View style={styles.main}>
 
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoText}>N</Text>
-            </View>
+            <View style={{ alignItems: 'center', marginBottom: 18 }}><SecondMeetMark size={62} /></View>
 
             <Text style={styles.title}>
               Create your account
             </Text>
 
             <Text style={styles.subtitle}>
-              Join Nearby and start meeting real people
+              Join SecondMeet and start meeting real people
               around you.
             </Text>
 
@@ -118,7 +125,7 @@ export default function CreateAccountScreen() {
                 setMessage('');
               }}
               placeholder="Enter your email"
-              placeholderTextColor="#666671"
+              placeholderTextColor={colors.subtle}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -130,7 +137,7 @@ export default function CreateAccountScreen() {
               Password
             </Text>
 
-            <View style={styles.passwordContainer}>
+            <GlassCard style={styles.passwordContainer}>
               <TextInput
                 value={password}
               onChangeText={(value) => {
@@ -138,7 +145,7 @@ export default function CreateAccountScreen() {
                 setMessage('');
               }}
                 placeholder="At least 6 characters"
-                placeholderTextColor="#666671"
+                placeholderTextColor={colors.subtle}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -155,15 +162,15 @@ export default function CreateAccountScreen() {
                   {showPassword ? 'Hide' : 'Show'}
                 </Text>
               </TouchableOpacity>
-            </View>
+            </GlassCard>
 
             <Text style={styles.helper}>
-              Use a password you don't use anywhere else.
+              Use a password you don&apos;t use anywhere else.
             </Text>
 
             {/* Terms */}
             <Text style={styles.terms}>
-              By creating an account, you agree to Nearby's
+              By creating an account, you agree to SecondMeet&apos;s
               Terms of Service and Privacy Policy.
             </Text>
 
@@ -178,7 +185,7 @@ export default function CreateAccountScreen() {
           {/* Bottom */}
           <View style={styles.bottom}>
 
-            <TouchableOpacity
+            <GradientButton
               style={[
                 styles.primaryButton,
                 (!canContinue || isSubmitting) && styles.disabledButton,
@@ -190,11 +197,16 @@ export default function CreateAccountScreen() {
               <Text style={styles.primaryButtonText}>
                 {isSubmitting ? 'Creating account…' : 'Create Account'}
               </Text>
-            </TouchableOpacity>
+            </GradientButton>
 
             <TouchableOpacity
               style={styles.loginButton}
               activeOpacity={0.8}
+              onPress={() =>
+                router.push(
+                  DEVELOPMENT_AUTH_BYPASS ? '/create-profile' : ('/login' as Href),
+                )
+              }
             >
               <Text style={styles.loginText}>
                 Already have an account?{' '}
@@ -205,16 +217,16 @@ export default function CreateAccountScreen() {
             </TouchableOpacity>
 
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(c: ReturnType<typeof useTheme>['colors']) { return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09090D',
+    backgroundColor: c.background,
   },
 
   keyboard: {
@@ -222,7 +234,8 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flex: 1,
+    flexGrow: 1,
+    width: '100%', maxWidth: 520, alignSelf: 'center',
     paddingHorizontal: 24,
     paddingBottom: 20,
   },
@@ -238,62 +251,49 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#17171E',
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   backText: {
-    color: '#FFFFFF',
+    color: c.text,
     fontSize: 32,
     lineHeight: 34,
     marginTop: -4,
   },
 
   stepText: {
-    color: '#777783',
+    color: c.muted,
     fontSize: 13,
     fontWeight: '600',
   },
 
   main: {
-    flex: 1,
+    flexGrow: 1,
+    paddingVertical: 28,
     justifyContent: 'center',
-  },
-
-  logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#E83E8C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 30,
-    fontWeight: '800',
   },
 
   title: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    lineHeight: 40,
+    color: c.text,
+    fontSize: 26,
+    lineHeight: 32,
+    textAlign: 'center',
     fontWeight: '700',
     marginBottom: 12,
   },
 
   subtitle: {
-    color: '#A9A9B2',
-    fontSize: 16,
-    lineHeight: 24,
+    color: c.muted,
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'center',
     marginBottom: 32,
   },
 
   label: {
-    color: '#FFFFFF',
+    color: c.text,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 10,
@@ -304,9 +304,9 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#35353F',
-    backgroundColor: '#121219',
-    color: '#FFFFFF',
+    borderColor: c.border,
+    backgroundColor: c.input,
+    color: c.text,
     fontSize: 16,
     paddingHorizontal: 18,
   },
@@ -315,8 +315,8 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#35353F',
-    backgroundColor: '#121219',
+    borderColor: c.border,
+    backgroundColor: c.input,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   passwordInput: {
     flex: 1,
     height: '100%',
-    color: '#FFFFFF',
+    color: c.text,
     fontSize: 16,
     paddingHorizontal: 18,
   },
@@ -334,27 +334,27 @@ const styles = StyleSheet.create({
   },
 
   showText: {
-    color: '#E83E8C',
+    color: c.accent,
     fontSize: 14,
     fontWeight: '600',
   },
 
   helper: {
-    color: '#666671',
+    color: c.subtle,
     fontSize: 12,
     lineHeight: 18,
     marginTop: 9,
   },
 
   terms: {
-    color: '#666671',
+    color: c.subtle,
     fontSize: 11,
     lineHeight: 17,
     marginTop: 24,
   },
 
   message: {
-    color: '#F28BB9',
+    color: c.accent,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 12,
@@ -367,8 +367,8 @@ const styles = StyleSheet.create({
   primaryButton: {
     width: '100%',
     height: 58,
-    borderRadius: 18,
-    backgroundColor: '#E83E8C',
+    borderRadius: 28,
+    backgroundColor: c.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: c.onAccent,
     fontSize: 17,
     fontWeight: '700',
   },
@@ -389,12 +389,12 @@ const styles = StyleSheet.create({
   },
 
   loginText: {
-    color: '#8A8A95',
+    color: c.muted,
     fontSize: 14,
   },
 
   loginAccent: {
-    color: '#E83E8C',
+    color: c.accent,
     fontWeight: '700',
   },
-});
+}); }

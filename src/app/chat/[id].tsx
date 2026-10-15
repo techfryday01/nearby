@@ -1,7 +1,9 @@
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,75 +14,106 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { GlassBackground as SafeAreaView, GlassCard } from '../../components/Glass';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useMatches, type ChatMessage } from '../../state/MatchContext';
-
-const INITIAL_MESSAGES: ChatMessage[] = [
-  { id: 'welcome', text: 'Hey! Nice to match with you 😊', from: 'them' },
-  { id: 'reply', text: 'Hi! I’m glad we matched too.', from: 'me' },
-  { id: 'question', text: 'What do you like doing on the weekends?', from: 'them' },
-];
+import { useTheme } from '../../theme/ThemeContext';
+import { BottomNav } from '../../components/BottomNav';
+import { demoProfilePhoto } from '../../components/demoProfilePhoto';
 
 export default function ChatScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { matches, loadConversation, saveConversation } = useMatches();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
+
+  // Prevent screen capture while this chat screen is active.
+  usePreventScreenCapture('nearby-chat-protection');
+
+  const { matches, isMatchesLoaded, loadConversation, saveConversation } = useMatches();
   const match = matches.find((item) => item.id === id);
+
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isConversationLoaded, setIsConversationLoaded] = useState(false);
+  const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null);
+  const isConversationLoaded = loadedConversationId === id;
+
   const messagesRef = useRef<ChatMessage[]>([]);
-  const nextMessageId = useRef(Date.now());
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     let isMounted = true;
-    setIsConversationLoaded(false);
+    if (!isMatchesLoaded || !match || !id) {
+      return () => {
+        isMounted = false;
+      };
+    }
 
     loadConversation(id)
-      .then(async (savedMessages) => {
-        const restoredMessages = savedMessages ?? INITIAL_MESSAGES;
-        if (savedMessages === null) {
-          await saveConversation(id, restoredMessages);
-        }
+      .then((savedMessages) => {
+        const restoredMessages = savedMessages ?? [];
         if (!isMounted) return;
+
         messagesRef.current = restoredMessages;
         setMessages(restoredMessages);
-        setIsConversationLoaded(true);
+        setLoadedConversationId(id);
       })
       .catch(() => {
         if (!isMounted) return;
-        messagesRef.current = INITIAL_MESSAGES;
-        setMessages(INITIAL_MESSAGES);
-        setIsConversationLoaded(true);
-        Alert.alert('Could not load conversation', 'Showing the starter messages instead.');
+
+        messagesRef.current = [];
+        setMessages([]);
+        setLoadedConversationId(id);
+
+        Alert.alert(
+          'Could not load conversation',
+          'You can still send a message, but the saved history could not be loaded.',
+        );
       });
 
     return () => {
       isMounted = false;
     };
-  }, [id, loadConversation, saveConversation]);
+  }, [id, isMatchesLoaded, loadConversation, match, saveConversation]);
+
+  useEffect(() => {
+    if (isMatchesLoaded && !match) {
+      Alert.alert('Match required', 'Chats are available only with people you have matched with.');
+      router.replace('/matches');
+    }
+  }, [isMatchesLoaded, match, router]);
 
   const sendMessage = () => {
     const text = draft.trim();
-    if (!text || !isConversationLoaded) return;
 
-    nextMessageId.current += 1;
+    if (!text || !isConversationLoaded || !match) return;
+
     const nextMessages: ChatMessage[] = [
       ...messagesRef.current,
-      { id: `sent-${nextMessageId.current}`, text, from: 'me' },
+      {
+        id: `sent-${Date.now()}`,
+        text,
+        from: 'me',
+        sentAt: new Date().toISOString(),
+      },
     ];
+
     messagesRef.current = nextMessages;
     setMessages(nextMessages);
     setDraft('');
+
     void saveConversation(id, nextMessages).catch(() => {
-      Alert.alert('Could not save message', 'Your message is visible but may not be saved.');
+      Alert.alert(
+        'Could not save message',
+        'Your message is visible but may not be saved.',
+      );
     });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#09090D" />
+      <StatusBar barStyle={colors.background === '#080B16' ? 'light-content' : 'dark-content'} />
+
       <KeyboardAvoidingView
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -91,16 +124,30 @@ export default function ChatScreen() {
               accessibilityRole="button"
               accessibilityLabel="Back to matches"
               onPress={() => router.back()}
-              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.backButton,
+                pressed && styles.pressed,
+              ]}
             >
               <Text style={styles.backText}>‹</Text>
             </Pressable>
-            <View style={[styles.avatar, { backgroundColor: match?.color ?? '#563146' }]}>
-              <Text style={styles.avatarInitial}>{match?.initials ?? 'N'}</Text>
+
+            <View
+              style={[
+                styles.avatar,
+                { backgroundColor: match?.color ?? colors.accent },
+              ]}
+            >
+              {match?.photoUri ? <Image source={{ uri: match.photoUri }} style={StyleSheet.absoluteFill} /> : match && demoProfilePhoto(match.id) ? <Image source={demoProfilePhoto(match.id)!} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <Text style={styles.avatarInitial}>{match?.initials ?? 'N'}</Text>}
             </View>
+
             <View style={styles.headerInfo}>
-              <Text style={styles.personName}>{match?.name ?? 'Nearby member'}</Text>
-              <Text style={styles.matchStatus}>You matched on Nearby</Text>
+              <Text style={styles.personName}>
+                {match?.name ?? 'SecondMeet member'}
+              </Text>
+              <Text style={styles.matchStatus}>
+                You matched on SecondMeet
+              </Text>
             </View>
           </View>
 
@@ -109,30 +156,42 @@ export default function ChatScreen() {
             style={styles.messagesScroll}
             contentContainerStyle={styles.messagesContent}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            onContentSizeChange={() =>
+              scrollViewRef.current?.scrollToEnd({ animated: true })
+            }
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.matchNotice}>
+            <GlassCard style={styles.matchNotice}>
               <Text style={styles.matchNoticeHeart}>♥</Text>
               <Text style={styles.matchNoticeTitle}>It’s a match!</Text>
-              <Text style={styles.matchNoticeText}>Start a conversation and say hello.</Text>
-            </View>
+              <Text style={styles.matchNoticeText}>
+                Start a conversation and say hello.
+              </Text>
+            </GlassCard>
+
             {isConversationLoaded ? (
               messages.map((message) => {
                 const isMine = message.from === 'me';
+
                 return (
                   <View
                     key={message.id}
-                    style={[styles.messageRow, isMine && styles.myMessageRow]}
+                    style={[
+                      styles.messageRow,
+                      isMine && styles.myMessageRow,
+                    ]}
                   >
-                    <Text style={[styles.messageBubble, isMine ? styles.myMessage : styles.theirMessage]}>
-                      {message.text}
-                    </Text>
+                    <GlassCard style={[styles.bubblePanel, isMine && styles.myBubblePanel]}>
+                      <Text style={[styles.messageBubble, isMine ? styles.myMessage : styles.theirMessage]}>{message.text}</Text>
+                      {message.sentAt && Number.isFinite(Date.parse(message.sentAt)) ? <Text style={styles.timestamp}>{new Date(message.sentAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text> : null}
+                    </GlassCard>
                   </View>
                 );
               })
             ) : (
-              <Text style={styles.loadingText}>Loading conversation...</Text>
+              <Text style={styles.loadingText}>
+                Loading conversation...
+              </Text>
             )}
           </ScrollView>
 
@@ -140,22 +199,28 @@ export default function ChatScreen() {
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder={isConversationLoaded ? 'Write a message...' : 'Loading conversation...'}
-              placeholderTextColor="#777783"
+              placeholder={
+                isConversationLoaded
+                  ? 'Write a message...'
+                    : 'Loading conversation...'
+              }
+              placeholderTextColor={colors.subtle}
               style={styles.input}
-              editable={isConversationLoaded}
+              editable={isConversationLoaded && Boolean(match)}
               returnKeyType="send"
               onSubmitEditing={sendMessage}
               accessibilityLabel="Message"
             />
+
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Send message"
-              disabled={!draft.trim() || !isConversationLoaded}
+              disabled={!draft.trim() || !isConversationLoaded || !match}
               onPress={sendMessage}
               style={({ pressed }) => [
                 styles.sendButton,
-                !draft.trim() && styles.sendButtonDisabled,
+                (!draft.trim() || !isConversationLoaded || !match) &&
+                  styles.sendButtonDisabled,
                 pressed && styles.pressed,
               ]}
             >
@@ -164,58 +229,125 @@ export default function ChatScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <BottomNav active="matches" />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09090D' },
-  keyboard: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: 18 },
+function makeStyles(c: ReturnType<typeof useTheme>['colors']) { return StyleSheet.create({
+  bubblePanel: { maxWidth: '84%', borderRadius: 20, padding: 3 },
+  myBubblePanel: { borderColor: c.accent },
+  timestamp: { color: c.muted, fontSize: 10, paddingHorizontal: 12, paddingBottom: 7, textAlign: 'right' },
+  container: {
+    flex: 1,
+    backgroundColor: c.background,
+  },
+  keyboard: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 18,
+  },
   header: {
     minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#23232C',
+    borderBottomColor: c.border,
     paddingBottom: 12,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#17171E',
+    backgroundColor: c.surfaceStrong,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  backText: { color: '#FFFFFF', fontSize: 30, lineHeight: 32, marginTop: -4 },
-  avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: '#FFFFFF', fontSize: 19, fontWeight: '600' },
-  headerInfo: { flex: 1, marginLeft: 11 },
-  personName: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  matchStatus: { color: '#A9A9B2', fontSize: 11, marginTop: 3 },
-  messagesScroll: { flex: 1 },
-  messagesContent: { paddingTop: 22, paddingBottom: 20 },
-  loadingText: { color: '#A9A9B2', fontSize: 13, textAlign: 'center', marginTop: 10 },
+  backText: {
+    color: c.onAccent,
+    fontSize: 30,
+    lineHeight: 32,
+    marginTop: -4,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    color: c.text,
+    fontSize: 19,
+    fontWeight: '600',
+  },
+  headerInfo: {
+    flex: 1,
+    marginLeft: 11,
+  },
+  personName: {
+    color: c.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  matchStatus: {
+    color: c.muted,
+    fontSize: 11,
+    marginTop: 3,
+  },
+  messagesScroll: {
+    flex: 1,
+  },
+  messagesContent: {
+    paddingTop: 22,
+    paddingBottom: 20,
+  },
+  loadingText: {
+    color: c.muted,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 10,
+  },
   matchNotice: {
     alignItems: 'center',
-    backgroundColor: '#141119',
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: '#352332',
+    borderColor: c.border,
     borderRadius: 18,
     paddingVertical: 17,
     paddingHorizontal: 12,
     marginBottom: 24,
   },
-  matchNoticeHeart: { color: '#E83E8C', fontSize: 21 },
-  matchNoticeTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginTop: 5 },
-  matchNoticeText: { color: '#A9A9B2', fontSize: 12, marginTop: 5 },
-  messageRow: { flexDirection: 'row', justifyContent: 'flex-start', marginBottom: 11 },
-  myMessageRow: { justifyContent: 'flex-end' },
+  matchNoticeHeart: {
+    color: c.accent,
+    fontSize: 21,
+  },
+  matchNoticeTitle: {
+    color: c.text,
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 5,
+  },
+  matchNoticeText: {
+    color: c.muted,
+    fontSize: 12,
+    marginTop: 5,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginBottom: 11,
+  },
+  myMessageRow: {
+    justifyContent: 'flex-end',
+  },
   messageBubble: {
-    maxWidth: '82%',
-    color: '#FFFFFF',
+    maxWidth: '100%',
+    color: c.text,
     fontSize: 14,
     lineHeight: 20,
     paddingHorizontal: 14,
@@ -223,8 +355,15 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: 'hidden',
   },
-  theirMessage: { backgroundColor: '#1B1B24', borderBottomLeftRadius: 5 },
-  myMessage: { backgroundColor: '#8F2858', borderBottomRightRadius: 5 },
+  theirMessage: {
+    backgroundColor: c.surfaceStrong,
+    borderBottomLeftRadius: 5,
+  },
+  myMessage: {
+    color: c.onAccent,
+    backgroundColor: c.accent,
+    borderBottomRightRadius: 5,
+  },
   composer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -232,14 +371,14 @@ const styles = StyleSheet.create({
     paddingTop: 11,
     paddingBottom: 9,
     borderTopWidth: 1,
-    borderTopColor: '#23232C',
+    borderTopColor: c.border,
   },
   input: {
     flex: 1,
     minHeight: 48,
     borderRadius: 16,
-    backgroundColor: '#17171E',
-    color: '#FFFFFF',
+    backgroundColor: c.input,
+    color: c.text,
     fontSize: 14,
     paddingHorizontal: 15,
   },
@@ -248,11 +387,19 @@ const styles = StyleSheet.create({
     minWidth: 64,
     paddingHorizontal: 13,
     borderRadius: 15,
-    backgroundColor: '#E83E8C',
+    backgroundColor: c.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendButtonDisabled: { opacity: 0.5 },
-  sendText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  pressed: { opacity: 0.75 },
-});
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
+  sendText: {
+    color: c.onAccent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  pressed: {
+    opacity: 0.75,
+  },
+}); }

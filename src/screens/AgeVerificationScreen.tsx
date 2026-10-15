@@ -1,88 +1,30 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { GlassBackground as SafeAreaView, GradientButton } from '../components/Glass';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../theme/ThemeContext';
+import { DateOfBirthInput, validateAdultDateOfBirth } from '../components/DateOfBirthInput';
 
 export default function AgeVerificationScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [dateOfBirth, setDateOfBirth] = useState('');
 
   const validateAge = () => {
-    const parts = dateOfBirth.trim().split('/');
-
-    if (parts.length !== 3) {
-      Alert.alert(
-        'Enter your date of birth',
-        'Please use the format DD/MM/YYYY.'
-      );
-      return;
-    }
-
-    const day = Number(parts[0]);
-    const month = Number(parts[1]);
-    const year = Number(parts[2]);
-
-    if (
-      !Number.isInteger(day) ||
-      !Number.isInteger(month) ||
-      !Number.isInteger(year) ||
-      day < 1 ||
-      day > 31 ||
-      month < 1 ||
-      month > 12 ||
-      year < 1900
-    ) {
-      Alert.alert(
-        'Invalid date',
-        'Please enter a valid date of birth.'
-      );
-      return;
-    }
-
-    const birthDate = new Date(year, month - 1, day);
-
-    if (
-      birthDate.getFullYear() !== year ||
-      birthDate.getMonth() !== month - 1 ||
-      birthDate.getDate() !== day
-    ) {
-      Alert.alert(
-        'Invalid date',
-        'Please enter a real calendar date.'
-      );
-      return;
-    }
-
-    const today = new Date();
-
-    let age = today.getFullYear() - year;
-
-    const birthdayPassed =
-      today.getMonth() > month - 1 ||
-      (
-        today.getMonth() === month - 1 &&
-        today.getDate() >= day
-      );
-
-    if (!birthdayPassed) {
-      age -= 1;
-    }
-
-    if (age < 18) {
-      Alert.alert(
-        'Sorry',
-        'Nearby is currently available only to people aged 18 or older.'
-      );
+    const validationError = validateAdultDateOfBirth(dateOfBirth);
+    if (validationError) {
+      Alert.alert(validationError.includes('18 or older') ? 'Sorry' : 'Invalid date', validationError);
       return;
     }
 
@@ -91,16 +33,13 @@ export default function AgeVerificationScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="#09090D"
-      />
+      <StatusBar barStyle={colors.background === '#080B16' ? 'light-content' : 'dark-content'} />
 
       <KeyboardAvoidingView
         style={styles.keyboard}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
           {/* TOP BAR */}
           <View style={styles.topRow}>
@@ -127,29 +66,19 @@ export default function AgeVerificationScreen() {
             </View>
 
             <Text style={styles.title}>
-              Before we continue
+              Let’s verify your age
             </Text>
 
             <Text style={styles.subtitle}>
-              Nearby is an adults-only dating and social
-              connection app. Please enter your date of birth.
+              You must be at least 18 years old
+              to use SecondMeet.
             </Text>
 
             <Text style={styles.label}>
               Date of birth
             </Text>
 
-            <TextInput
-              value={dateOfBirth}
-              onChangeText={setDateOfBirth}
-              placeholder="DD/MM/YYYY"
-              placeholderTextColor="#666671"
-              keyboardType="number-pad"
-              maxLength={10}
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <DateOfBirthInput value={dateOfBirth} onChangeText={setDateOfBirth} />
 
             <Text style={styles.helper}>
               Your exact date of birth will not be displayed
@@ -161,7 +90,7 @@ export default function AgeVerificationScreen() {
           {/* BOTTOM */}
           <View style={styles.bottom}>
 
-            <TouchableOpacity
+            <GradientButton
               style={styles.primaryButton}
               activeOpacity={0.85}
               onPress={validateAge}
@@ -169,7 +98,7 @@ export default function AgeVerificationScreen() {
               <Text style={styles.primaryButtonText}>
                 Continue
               </Text>
-            </TouchableOpacity>
+            </GradientButton>
 
             <Text style={styles.footer}>
               By continuing, you confirm that the information
@@ -178,16 +107,16 @@ export default function AgeVerificationScreen() {
 
           </View>
 
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(c: ReturnType<typeof useTheme>['colors']) { return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09090D',
+    backgroundColor: c.background,
   },
 
   keyboard: {
@@ -195,7 +124,8 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flex: 1,
+    flexGrow: 1,
+    width: '100%', maxWidth: 520, alignSelf: 'center',
     paddingHorizontal: 24,
     paddingBottom: 24,
   },
@@ -211,64 +141,68 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#17171E',
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   backText: {
-    color: '#FFFFFF',
+    color: c.text,
     fontSize: 34,
     lineHeight: 36,
     marginTop: -4,
   },
 
   stepText: {
-    color: '#777783',
+    color: c.muted,
     fontSize: 13,
     fontWeight: '600',
   },
 
   main: {
-    flex: 1,
+    flexGrow: 1,
+    paddingVertical: 28,
     justifyContent: 'center',
   },
 
   iconCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: '#241522',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: c.accentSoft,
     borderWidth: 1.5,
-    borderColor: '#E83E8C',
+    borderColor: c.accent,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 28,
+    alignSelf: 'center',
   },
 
   iconText: {
-    color: '#E83E8C',
+    color: c.accent,
     fontSize: 20,
     fontWeight: '800',
   },
 
   title: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    lineHeight: 40,
+    color: c.text,
+    fontSize: 30,
+    lineHeight: 36,
+    textAlign: 'center',
     fontWeight: '700',
     marginBottom: 14,
   },
 
   subtitle: {
-    color: '#A9A9B2',
-    fontSize: 16,
-    lineHeight: 24,
+    color: c.muted,
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'center',
     marginBottom: 36,
   },
 
   label: {
-    color: '#FFFFFF',
+    color: c.text,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 10,
@@ -278,15 +212,15 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#35353F',
-    backgroundColor: '#121219',
-    color: '#FFFFFF',
+    borderColor: c.border,
+    backgroundColor: c.input,
+    color: c.text,
     fontSize: 17,
     paddingHorizontal: 18,
   },
 
   helper: {
-    color: '#6F6F79',
+    color: c.subtle,
     fontSize: 12,
     lineHeight: 18,
     marginTop: 10,
@@ -299,24 +233,24 @@ const styles = StyleSheet.create({
   primaryButton: {
     width: '100%',
     height: 58,
-    borderRadius: 18,
-    backgroundColor: '#E83E8C',
+    borderRadius: 28,
+    backgroundColor: c.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: c.onAccent,
     fontSize: 17,
     fontWeight: '700',
   },
 
   footer: {
-    color: '#666671',
+    color: c.subtle,
     fontSize: 11,
     lineHeight: 16,
     textAlign: 'center',
     marginTop: 14,
     maxWidth: 330,
   },
-});
+}); }

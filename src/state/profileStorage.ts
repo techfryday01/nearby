@@ -8,6 +8,13 @@ export type UserProfile = {
   gender: string;
   selectedInterests: string[];
   profilePhotoUri: string | null;
+  /** Ordered gallery URLs or local device URIs. The first item is the main photo. */
+  profilePhotos?: string[];
+  /** Private storage object paths corresponding to profilePhotos when cloud sync is active. */
+  profilePhotoPaths?: string[];
+  /** Device-only retry marker, scoped to the signed-in account. Never sent to Discovery. */
+  pendingPhotoUserId?: string;
+  isDiscoverable?: boolean;
 };
 
 function isUserProfile(value: unknown): value is UserProfile {
@@ -20,7 +27,11 @@ function isUserProfile(value: unknown): value is UserProfile {
     typeof profile.gender === 'string' &&
     Array.isArray(profile.selectedInterests) &&
     profile.selectedInterests.every((interest) => typeof interest === 'string') &&
-    (typeof profile.profilePhotoUri === 'string' || profile.profilePhotoUri === null)
+    (typeof profile.profilePhotoUri === 'string' || profile.profilePhotoUri === null) &&
+    (profile.profilePhotos === undefined || (Array.isArray(profile.profilePhotos) && profile.profilePhotos.every((photo) => typeof photo === 'string'))) &&
+    (profile.profilePhotoPaths === undefined || (Array.isArray(profile.profilePhotoPaths) && profile.profilePhotoPaths.every((path) => typeof path === 'string'))) &&
+    (profile.isDiscoverable === undefined || typeof profile.isDiscoverable === 'boolean')
+    && (profile.pendingPhotoUserId === undefined || typeof profile.pendingPhotoUserId === 'string')
   );
 }
 
@@ -38,4 +49,8 @@ export async function loadUserProfile(): Promise<UserProfile | null> {
 
 export async function storeUserProfile(profile: UserProfile): Promise<void> {
   await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+}
+
+export async function clearUserProfile(): Promise<void> {
+  await AsyncStorage.removeItem(PROFILE_STORAGE_KEY);
 }

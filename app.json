@@ -1,32 +1,54 @@
 {
   "expo": {
-    "name": "nearby",
+    "name": "SecondMeet",
     "slug": "nearby",
     "scheme": "nearby",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/secondmeet-heart-no-text.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#080B16",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#080B16",
+        "foregroundImage": "./assets/secondmeet-heart-no-text.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.nearby"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/secondmeet-heart-no-text.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#080B16",
+          "image": "./assets/secondmeet-heart-no-text.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SecondMeet only accesses the photo you choose for your profile.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "65222da8-f75a-40b9-8760-6229319e2af8"
+      }
     }
   }
 }
